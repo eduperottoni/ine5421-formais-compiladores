@@ -3,7 +3,7 @@
  4;A;{D};{a,b};A,a,A;A,a,B;A,b,A;B,b,C;C,b,D
 --- Expected output (text)---
  4;{A};{{AD}};{a,b};{A},a;{AB};{A},b,{A};{AB},a,{AB};{AB};b,{AC};{AC},a,{AB};{AC},b,{AD};{AD},a,{AB};{AD},b,{A}
- 
+
 2
 --- Input ---
  3;A;{C};{1,2,3,&};A,1,A;A,&,B;B,2,B;B,&,C;C,3,C

@@ -11,10 +11,14 @@ class AF:
         self.__e_closure = {}
         self.__transitions_by_source = {}
         self.__load_from_input(input)
+        self.__states = self.__order(self.__states)
         self.__compute_e_closures()
         self.__rebuild_states()
         self.__build_transitions_by_source()
         self.determinize()
+
+    def __order(self, collection: set[str] | list[str]) -> list[str]:
+        return sorted(collection)
 
     def __build_transitions_by_source(self) -> None:
         for transition in self.__transitions:
@@ -74,7 +78,7 @@ class AF:
         states_qtt = int(splited[0])
         self.__initial_state: str = splited[1]
         self.__final_states: set[str] = set(splited[2][1:-1].split(','))
-        self.__alphabet: set[str] = set(splited[3][1:-1].split(','))
+        self.__alphabet: list[str] = sorted(set(splited[3][1:-1].split(',')))
 
         # Loading transitions
         for transition in splited[4:len(splited)]:
@@ -99,7 +103,11 @@ class AF:
                 new_transition = Transition(source, symbol, set(target))
                 self.__transitions.add(new_transition)
 
+        for transition in self.__transitions:
+            transition.target = self.__order(transition.target)
+        
         assert states_qtt == len(self.__states)
+
 
         print(f'Estado inicial: {self.__initial_state}')
         print(f'Estados finais: {self.__final_states}')
@@ -112,9 +120,7 @@ class AF:
         """
         Rebuild the states based on the sets created in targets
         """
-
-        if self.__has_e_transitions:
-            self.__initial_state = self.__e_closure[self.__initial_state]
+        self.__initial_state = self.__e_closure[self.__initial_state]
 
         print(f'STATES REBUILDED: {self.__states}')
 
@@ -130,6 +136,10 @@ class AF:
     def determinize(self):
         to_visit_list = [self.__initial_state]
         visited_list = []
+        print_information = {
+            'transitions': [],
+            'states': []
+        }
         while len(to_visit_list) > 0:
 
             state = to_visit_list.pop(0)
@@ -149,6 +159,11 @@ class AF:
                                     tmp_result |= self.__e_closure[target]
 
                     if tmp_result:
+                        print_information['transitions'].append({
+                            'source': state,
+                            'symbol': symbol,
+                            'target': tmp_result
+                        })
                         print(f'TRANSIÇÃO: {state} + {symbol} -> {tmp_result}')
                     
                     insert = bool(tmp_result)
@@ -158,5 +173,37 @@ class AF:
 
                     if insert: 
                         to_visit_list.append(tmp_result)
-            
-        print(f'LISTA DE ESTADOS: {visited_list}')
+
+        print_information['states'] = visited_list
+
+        self.__print_determinized_af(print_information) 
+
+    def __print_determinized_af(self, information: dict) -> None:
+        ## Número de estados do autômao determinizado
+        number_of_states = len(information['states'])
+
+        ## Novos estados de aceitação
+        final_states = []
+        for state in information['states']:
+            # Verifica quais dos estados do novo autômato são de aceitação
+            if state & self.__final_states and state not in final_states:
+                final_states.append(state)
+        ordered_final_states = []
+        for state in final_states:
+            ordered_final_states.append(self.__order(state))
+
+        ## Estado inicial
+        initial_state = self.__initial_state
+
+        ## Transições
+        ordered_transitions = []
+        for t in information['transitions']:
+            ordered_transitions.append(
+                f'{{{"".join(self.__order(t["source"]))}}},{t["symbol"]},{{{"".join(self.__order(t["target"]))}}}'
+            )
+        ordered_transitions_str = ';'.join(ordered_transitions)
+
+        print(number_of_states)
+        print(initial_state)
+        print(final_states)
+        print(ordered_transitions_str)
