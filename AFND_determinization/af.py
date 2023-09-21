@@ -1,6 +1,8 @@
 from .transition import Transition
 import logging
 
+logging.basicConfig(level=logging.DEBUG)
+
 class AF:
     """
     Class to handle with the finite automata
@@ -140,6 +142,7 @@ class AF:
         # logging.debug(f'STATES REBUILDED: {self.__states}')
 
 
+    # TODO Remove this, and make something more generic
     def __get_transition_by_source_and_symbol(self, source: str, symbol: str) -> Transition | None:
         
         for transition in self.__transitions_by_source[source]:
@@ -201,6 +204,167 @@ class AF:
         self.__determinized_states = visited_list
 
         self.__format_and_print_af(self.__determinized_states, self.__determinized_transitions) 
+
+    
+    def minimize(self) -> None:
+        """
+        Macro algorithm to miniminization
+        """
+        self.__compute_unreachable_states()
+        self.__compute_dead_states()
+        self.__compute_equivalent_states()
+
+    
+    def __compute_unreachable_states(self) -> None:
+        """
+        Computes the unreachable states, creating new transitions
+        and states sets without this computed states
+        """
+        self.__minimized_transitions = set()
+        to_visit, visited = [self.__initial_state], []
+
+        # Busca pelos inalcançáveis
+        while len(to_visit) > 0:
+            state = to_visit.pop(0)
+            visited.append(state)
+
+            reachable, transitions = self.__get_all_target_states_and_transitions(state)
+
+            for state in reachable:
+                if state not in to_visit and state not in visited:
+                    to_visit.append(state)
+
+            self.__minimized_transitions |= transitions
+        
+        self.__minimized_states = set(visited) & set(self.__states)
+        self.__minimized_final_states = set(visited) & self.__final_states
+
+    
+    def __get_all_target_states_and_transitions(self, state: str) -> list[str]:
+        """
+        Returns all reachable states from specified state
+        """
+        reachable, transitions = set(), set()
+        for transition in self.__transitions:
+            if transition.source == state:
+                reachable.add(transition.target[0])
+                transitions.add(transition)
+        return reachable, transitions
+
+
+    def __compute_dead_states(self) -> None:
+        """
+        Computes dead states and updates the minimized structures
+        """
+        to_visit, visited = list(self.__minimized_final_states), []
+
+        # Seach for the dead states
+        while len(to_visit) > 0:
+            state = to_visit.pop(0)
+            visited.append(state)
+
+            not_dead, transitions = self.__get_all_source_states_and_transitions(state)
+
+            print(f'NOT_DEAD STATES: {not_dead}')
+
+            for state in not_dead:
+                if state not in visited and state not in to_visit:
+                    to_visit.append(state)
+
+            self.__minimized_transitions |= transitions
+
+        self.__minimized_states = set(visited) & self.__minimized_states
+        self.__minimized_final_states = set(visited) & self.__minimized_final_states
+
+
+    def __get_all_source_states_and_transitions(self, state: str) -> list[str]:
+        """
+        Returns all reachable source states from specified target_state
+        """
+        reachable, transitions = set(), set()
+        for transition in self.__minimized_transitions:
+            if transition.target[0] == state:
+                reachable.add(transition.source)
+                transitions.add(transition)
+        return reachable, transitions
+
+
+    def __compute_equivalent_states(self) -> None:
+        """
+        Algorithm to separe the states to equivalent states sets
+        """
+        eq_states = {frozenset(self.__minimized_final_states), frozenset(self.__minimized_states - self.__minimized_final_states)}
+        print(f'VAMOS COMPUTAR OS ESTADOS EQUIVALENTES')
+        print(f'EQUIVALENTES: {eq_states}')
+
+        
+
+        # For each transition, 
+        while True:
+            
+            for symbol in self.__alphabet:
+                print(f'SYMBOL: {symbol}')
+                # Dicionário auxiliar para mapear quem pode chegar nos determinados conjuntos
+                # 
+                # print(f'DICIONÁRIO AUXILIAR: {new_dict}')
+                # Preenche o dicionário auxiliar de acordo com as transições de cada estado
+
+                for _set in eq_states:
+                    print(f'SET: {_set}')
+                    current_set = set()
+                    new_sets = self.__create_auxiliary_dict(eq_states)
+                    print(new_sets)
+                    #Aqui eu preciso de uma chave para cada conjunto que existe
+                    #A cada conjunto de cada conjunto, eu crio novos conjuntos baseados em onde eles apontam
+                    for state in _set:
+                        target = self.__get_transition_by_source_and_symbol(state, symbol, self.__minimized_transitions).target[0]
+                        
+                        if target in _set:
+                            current_set.add(state)
+                        else:
+                            for s in new_sets:
+                                if target in s:
+                                    new_sets[s].add(state)
+
+                    print(f'CURRENT_SET: {current_set}')
+                    print(f'NEW_SETS: {new_sets}')
+
+            break
+
+
+
+        # for state in final_states:
+        #     for 
+
+    
+    def __get_transition_by_source_and_symbol(self, source: str, symbol: str, transitions: list | set) -> Transition:
+        for t in transitions:
+            if t.source == source and t.symbol == symbol:
+                return t
+        return None
+
+    def __create_auxiliary_dict(self, eq_sets: set[str]) -> None:
+        """
+        Creates auxiliary dict based on the current equivalent sets
+        """
+        aux_dict = {}
+
+        for _set in eq_sets:
+            aux_dict[_set] = set()
+        aux_dict['death'] = set()
+
+        return aux_dict
+    
+
+
+
+
+    
+
+        
+
+
+
 
 
     def __format_and_print_af(self, states_list: list[set[str]], transitions_list: list[Transition]) -> None:
