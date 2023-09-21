@@ -12,13 +12,15 @@ class AF:
         self.__transitions_by_source = {}
         self.__load_from_input(input)
         self.__states = self.__order(self.__states)
+
         self.__compute_e_closures()
-        self.__rebuild_states()
+        self.__rebuild_initial_state()
         self.__build_transitions_by_source()
         self.determinize()
 
     def __order(self, collection: set[str] | list[str]) -> list[str]:
         return sorted(collection)
+
 
     def __build_transitions_by_source(self) -> None:
         for transition in self.__transitions:
@@ -27,7 +29,7 @@ class AF:
             else:
                 self.__transitions_by_source[transition.source] = {transition, }
 
-        print(f'Transições por source: {self.__transitions_by_source}')
+        # print(f'Transições por source: {self.__transitions_by_source}')
 
     def __compute_e_closures(self):
         if self.__has_e_transitions:
@@ -35,7 +37,7 @@ class AF:
         else:
             self.__generate_simple_e_closures()
         
-        print(f'&-fechos: {self.__e_closure}')
+        # print(f'&-fechos: {self.__e_closure}')
 
 
     def __deep_search_e_closure(self, e_closure: set[str], state: str, transitions: set[Transition]):
@@ -52,7 +54,7 @@ class AF:
 
     def __generate_deep_e_closures(self):
         for state in self.__states:
-            print(f'BUSCANDO FECHO DO ESTADO {state}')
+            # print(f'BUSCANDO FECHO DO ESTADO {state}')
             e_closure: set[str] = set(state)
             self.__e_closure[state] = self.__deep_search_e_closure(e_closure, 
                                                                    state, 
@@ -109,20 +111,22 @@ class AF:
         assert states_qtt == len(self.__states)
 
 
-        print(f'Estado inicial: {self.__initial_state}')
-        print(f'Estados finais: {self.__final_states}')
-        print(f'Estados: {self.__states}')
-        print(f'Alfabeto: {self.__alphabet}')
-        print(f'Transitions: {self.__transitions}')
-        print(f'Has &-transitions: {self.__has_e_transitions}')
+        # print(f'Estado inicial: {self.__initial_state}')
+        # print(f'Estados finais: {self.__final_states}')
+        # print(f'Estados: {self.__states}')
+        # print(f'Alfabeto: {self.__alphabet}')
+        # print(f'Transitions: {self.__transitions}')
+        # print(f'Has &-transitions: {self.__has_e_transitions}')
 
-    def __rebuild_states(self) -> None:
+
+    def __rebuild_initial_state(self) -> None:
         """
         Rebuild the states based on the sets created in targets
         """
         self.__initial_state = self.__e_closure[self.__initial_state]
 
-        print(f'STATES REBUILDED: {self.__states}')
+        # print(f'STATES REBUILDED: {self.__states}')
+
 
     def __get_transition_by_source_and_symbol(self, source: str, symbol: str) -> Transition | None:
         
@@ -130,7 +134,6 @@ class AF:
             if transition.symbol == symbol:
                 return transition
         return None
-        
 
 
     def determinize(self):
@@ -145,7 +148,6 @@ class AF:
             state = to_visit_list.pop(0)
             state = set(state) if not isinstance(state, set) else state
             visited_list.append(state)
-
 
             # Para cada subestado
             for symbol in self.__alphabet:
@@ -188,12 +190,22 @@ class AF:
             # Verifica quais dos estados do novo autômato são de aceitação
             if state & self.__final_states and state not in final_states:
                 final_states.append(state)
+
         ordered_final_states = []
         for state in final_states:
-            ordered_final_states.append(self.__order(state))
+            ordered_state  = self.__order(state)
+            ordered_final_states.append(
+                f'{{{"".join(self.__order(state))}}}'
+            )
+        ordered_final_states_str = f'{{{",".join(ordered_final_states)}}}'
+
+        ## Alfabeto sem epsilon
+        alphabet = self.__alphabet.copy()
+        if self.__has_e_transitions: alphabet.remove('&') 
+        alphabet_str = f'{{{",".join(alphabet)}}}'
 
         ## Estado inicial
-        initial_state = self.__initial_state
+        initial_state_str = f'{{{"".join(self.__order(information["states"][0]))}}}'
 
         ## Transições
         ordered_transitions = []
@@ -202,8 +214,7 @@ class AF:
                 f'{{{"".join(self.__order(t["source"]))}}},{t["symbol"]},{{{"".join(self.__order(t["target"]))}}}'
             )
         ordered_transitions_str = ';'.join(ordered_transitions)
+        
+        final_str = ';'.join([str(number_of_states), initial_state_str, ordered_final_states_str, alphabet_str, ordered_transitions_str])
 
-        print(number_of_states)
-        print(initial_state)
-        print(final_states)
-        print(ordered_transitions_str)
+        print(final_str)
