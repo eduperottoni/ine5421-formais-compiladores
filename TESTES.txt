@@ -39,3 +39,6 @@ Incorrect program output
 
 --- Expected output (text)---
  11;A;{A,F,N};{a,b,c,d};A,a,B;A,b,E;A,c,K;A,d,G;B,a,C;B,b,H;B,c,L;C,a,A;C,b,I;C,c,F;E,b,F;E,c,H;E,d,N;F,b,E;F,c,K;F,d,G;G,d,N;H,b,K;H,c,I;I,b,L;I,c,E;K,b,H;K.c,L;L,b,I;L,c,F;N,d,G
+
+
+ 11;A;{A,F,N};{a,b,c,d};A,a,B;A,b,E;A,c,K;A,d,G;B,a,C;B,b,H;B,c,L;C,a,A;C,b,I;C,c,F;E,b,F;E,c,H;E,d,N;F,b,E;F,c,K;F,d,G;G,d,N;H,b,K;H,c,I;I,b,L;I,c,E;K,b,H;K,c,L;L,b,I;L,c,F;N,d,G

@@ -1,5 +1,6 @@
 from .transition import Transition
 import logging
+from copy import deepcopy
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -123,7 +124,9 @@ class AF:
         for transition in self.__transitions:
             transition.target = self.__order(transition.target)
         
-        assert states_qtt == len(self.__states)
+
+        # TODO Uncomment below command when Jerusa fix the input
+        # assert states_qtt == len(self.__states)
 
         logging.debug(f'Estado inicial: {self.__initial_state}')
         logging.debug(f'Estados finais: {self.__final_states}')
@@ -203,7 +206,7 @@ class AF:
 
         self.__determinized_states = visited_list
 
-        self.__format_and_print_af(self.__determinized_states, self.__determinized_transitions) 
+        self.__format_and_print_af(self.__determinized_states, self.__determinized_transitions, True) 
 
     
     def minimize(self) -> None:
@@ -238,6 +241,7 @@ class AF:
         
         self.__minimized_states = set(visited) & set(self.__states)
         self.__minimized_final_states = set(visited) & self.__final_states
+        print(f'ESTADOS DEPOIS DE COMPUTAR OS inalcancáveis: {self.__minimized_states}')
 
     
     def __get_all_target_states_and_transitions(self, state: str) -> list[str]:
@@ -275,6 +279,7 @@ class AF:
 
         self.__minimized_states = set(visited) & self.__minimized_states
         self.__minimized_final_states = set(visited) & self.__minimized_final_states
+        print(f'ESTADOS DEPOIS DE COMPUTAR OS MORTOS: {self.__minimized_states}')
 
 
     def __get_all_source_states_and_transitions(self, state: str) -> list[str]:
@@ -293,9 +298,10 @@ class AF:
         """
         Algorithm to separe the states to equivalent states sets
         """
-        eq_states = {frozenset(self.__minimized_final_states), frozenset(self.__minimized_states - self.__minimized_final_states)}
+        current_eq_states = {frozenset(self.__minimized_final_states), frozenset(self.__minimized_states - self.__minimized_final_states)}
+        last_eq_states = deepcopy(current_eq_states)
         print(f'VAMOS COMPUTAR OS ESTADOS EQUIVALENTES')
-        print(f'EQUIVALENTES: {eq_states}')
+        print(f'EQUIVALENTES: {current_eq_states}')
 
         
 
@@ -304,37 +310,83 @@ class AF:
             
             for symbol in self.__alphabet:
                 print(f'SYMBOL: {symbol}')
+                print('-'*50)
                 # Dicionário auxiliar para mapear quem pode chegar nos determinados conjuntos
                 # 
                 # print(f'DICIONÁRIO AUXILIAR: {new_dict}')
                 # Preenche o dicionário auxiliar de acordo com as transições de cada estado
-
-                for _set in eq_states:
+                new_eq_states = set()
+                for _set in current_eq_states:
                     print(f'SET: {_set}')
                     current_set = set()
-                    new_sets = self.__create_auxiliary_dict(eq_states)
-                    print(new_sets)
-                    #Aqui eu preciso de uma chave para cada conjunto que existe
+                    new_sets = self.__create_auxiliary_dict(current_eq_states)
+                    print(f'DICT: {new_sets}')
                     #A cada conjunto de cada conjunto, eu crio novos conjuntos baseados em onde eles apontam
                     for state in _set:
-                        target = self.__get_transition_by_source_and_symbol(state, symbol, self.__minimized_transitions).target[0]
-                        
-                        if target in _set:
-                            current_set.add(state)
-                        else:
-                            for s in new_sets:
-                                if target in s:
-                                    new_sets[s].add(state)
 
+                        # In case of error, there's no transition by this source and symbol
+                        # so the state should be inserted in a new equivalent state
+                        # try:
+                        transition = self.__get_transition_by_source_and_symbol(state, symbol, self.__minimized_transitions)
+                        target = transition.target[0]
+                        print(f'TRANSIÇÃO: {transition}')
+                        inserted = False
+                        if target in _set:
+                            print(f'state {state} added in current_set')
+                            current_set.add(state)
+                            inserted = True
+                        else:
+                            for key in new_sets:
+                                if target in key:
+                                    print(f'state {state} added in NEW_SETS')
+                                    new_sets[key].add(state)
+                                    inserted = True
+
+                        if not inserted:
+                            print(f'state {state} added in death')
+                            new_sets['death'].add(state)
+    
+                        # except:
+                            
+                    
                     print(f'CURRENT_SET: {current_set}')
                     print(f'NEW_SETS: {new_sets}')
 
-            break
+                    new_set = set()
+                    if current_set:
+                        new_set.add(frozenset(current_set))
+                    for _set in new_sets.values():
+                        if _set:
+                            new_set.add(frozenset(_set))
+
+                    print(f'NEW_CURRENT_EQ: {new_set}')
+                    new_eq_states |= new_set
+                
+                print(f'OLHA O NOVO RESULTADO: {new_eq_states}')
+                
+                current_eq_states = new_eq_states
+
+                print('-'*30)
+                print(f'LAST_EQ_STATES: {last_eq_states}')
+                print(f'CURRENT_EQ_STATES: {current_eq_states}')
+            
+            if len(current_eq_states) == len(self.__minimized_states) or last_eq_states == current_eq_states:
+                break
+
+            # Atualizo o último set calculado apenas quando tiver calculado para todo o alfabeto
+            last_eq_states = current_eq_states
 
 
+        self.__minimized_states = [self.__order(set(frozen)) for frozen in current_eq_states]
+        self.__minimized_states_unique_name = [item[0] for item in self.__minimized_states]
+        self.__update_transitions_source_and_target_names()
+        self.__remove_redundant_transitions()
+        
+        self.__minimized_states = [{item[0]} for item in self.__minimized_states_unique_name]
+        self.__minimized_states.remove({self.__initial_state})
+        self.__minimized_states.insert(0, {self.__initial_state})
 
-        # for state in final_states:
-        #     for 
+        self.__format_and_print_af(self.__minimized_states, list(self.__minimized_transitions), False)
 
     
     def __get_transition_by_source_and_symbol(self, source: str, symbol: str, transitions: list | set) -> Transition:
@@ -342,6 +394,7 @@ class AF:
             if t.source == source and t.symbol == symbol:
                 return t
         return None
+
 
     def __create_auxiliary_dict(self, eq_sets: set[str]) -> None:
         """
@@ -356,18 +409,36 @@ class AF:
         return aux_dict
     
 
-
-
-
+    def __update_transitions_source_and_target_names(self) -> None:
+        for transition in self.__minimized_transitions:
+            print(f'TRansition a ser mudada: {transition}')
+            for index, state in enumerate(self.__minimized_states):
+                if transition.source in state:
+                    transition.source = self.__minimized_states_unique_name[index]
+                if transition.target[0] in state:
+                    transition.target = [self.__minimized_states_unique_name[index]]
+            print(f'Transitionmodificada: {transition}')
+                
     
 
-        
+    def __remove_redundant_transitions(self):
+        """
+        When we have equivalent states, we can remove redundant transitions
+        """
+        new_transitions = set()
+        print(self.__minimized_transitions)
+        for transition in self.__minimized_transitions:
+            # We only want what gets out of current minimized states
+            # and what does not goes to dead states
+            print(f'TRANSIÇÃO-: {transition}')
+            if transition.source in self.__minimized_states_unique_name and\
+               transition.target[0] in self.__minimized_states_unique_name:
+                print(f'TRANSIÇÃO+: {transition}')
+                new_transitions.add(transition)
+        self.__minimized_transitions = new_transitions
 
 
-
-
-
-    def __format_and_print_af(self, states_list: list[set[str]], transitions_list: list[Transition]) -> None:
+    def __format_and_print_af(self, states_list: list[set[str]], transitions_list: list[Transition], states_as_sets: bool) -> None:
         """
         Formats the output string and print the result
         """
@@ -384,8 +455,9 @@ class AF:
 
         ordered_final_states = []
         for state in final_states:
+            state_str = "".join(self.__order(state))
             ordered_final_states.append(
-                f'{{{"".join(self.__order(state))}}}'
+                f'{{{state_str}}}' if states_as_sets else state_str
             )
         ordered_final_states_str = f'{{{",".join(ordered_final_states)}}}'
 
@@ -395,7 +467,8 @@ class AF:
         alphabet_str = f'{{{",".join(alphabet)}}}'
 
         ## Estado inicial
-        initial_state_str = f'{{{"".join(self.__order(states_list[0]))}}}'
+        initial_state = "".join(self.__order(states_list[0]))
+        initial_state_str = f'{{{initial_state}}}' if states_as_sets else initial_state
 
         ## Transições
         transitions = [{'source': t.source, 'symbol': t.symbol, 'target': t.target} for t in transitions_list]
@@ -403,13 +476,15 @@ class AF:
         for t in transitions:
             t['source'] = "".join(self.__order(t['source']))
 
-        ordered_transitions = sorted(transitions, key=lambda x: (x['source'], x['source']))
+        # Ordena as transições pelo source da transição e depois pelo symbol
+        ordered_transitions = sorted(transitions, key=lambda x: (x['source'], x['symbol']))
 
         ordered_transitions_str = []
         for t in ordered_transitions:
-            # Ordena as transições pelo source da transição
+            source = "".join(self.__order(t["source"]))
+            target = "".join(self.__order(t["target"]))
             ordered_transitions_str.append(
-                f'{{{"".join(self.__order(t["source"]))}}},{t["symbol"]},{{{"".join(self.__order(t["target"]))}}}'
+                f'{{{source}}},{t["symbol"]},{{{target}}}' if states_as_sets else f'{source},{t["symbol"]},{target}'
             )
             
         ordered_transitions_str = ';'.join(ordered_transitions_str)
