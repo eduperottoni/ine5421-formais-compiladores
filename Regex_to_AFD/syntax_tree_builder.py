@@ -10,44 +10,25 @@ class SyntaxTree():
         Adiciona # ao final da palavra
         Adiciona . nos lugares que estão faltando
         """
-        self.masked_regex = f'({regex})#'
-        print(f'SELF_MASKED_REGEX: {self.masked_regex}')
+        masked_regex = f'({regex})#'
+        # print(f'SELF_MASKED_REGEX: {self.masked_regex}')
         new_regex = ''
-        """
-        aa sim
-        a( sim
-        )a sim
-        )( sim
-        *a não
-        a* não
-        (a não
-        a) não
-        """
-        for index, item in enumerate(self.masked_regex[:-1]):
+        
+        for index, item in enumerate(masked_regex[:-1]):
             # print(f'CURR_ELEMENT: {item}')
-            next_item = self.masked_regex[index + 1]
+            next_item = masked_regex[index + 1]
             # print(f'NEXT_ELEMENT: {next_item}')
             if item in self.alphabet:
                 # Case 'ab', 'a('
-                if next_item in self.alphabet or \
-                next_item == operators['par_initial']:
-                    new_regex += f'{item}.'
-                else:
-                    new_regex += item
+                new_regex += item if next_item in operators.values() and next_item != operators['par_initial'] else f'{item}.'
             elif item == operators['par_final']:
-                #Case ')a', ')('
-                if next_item in [operators['star'], operators['par_final']]:
-                    new_regex += item
-                else:
-                    new_regex += f'{item}.'
+                #Case ')*', '))'
+                new_regex += item if next_item in [operators['star'], operators['par_final']] else f'{item}.'
             elif item == operators['star']:
-                if next_item in self.alphabet or next_item == operators['par_initial']:
-                    new_regex += f'{item}.'
-                else:
-                    new_regex += f'{item}'
+                new_regex += item if next_item in operators.values() and next_item != operators['par_initial'] else f'{item}.'
             else:
                 new_regex += item
-            print(f'=>{new_regex}')
+            # print(f'=>{new_regex}')
 
         self.completed_regex = f'{new_regex}#'
         print(self.completed_regex)
