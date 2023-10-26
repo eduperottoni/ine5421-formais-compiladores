@@ -10,7 +10,7 @@ class SyntaxTreeNode:
         # Symbol: a operator or an item of the alphabet
         self.symbol = symbol
         # Information needed to AFD tranmformation
-        self.nullable = symbol == '*'
+        self.nullable = symbol in ('*', '&')
         self.first_pos = None
         self.last_pos = None
         # Child nodes
