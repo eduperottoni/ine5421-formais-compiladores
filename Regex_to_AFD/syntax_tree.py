@@ -13,6 +13,7 @@ class SyntaxTreeNode:
         self.nullable = symbol in ('*', '&')
         self.first_pos = None
         self.last_pos = None
+        self.id = None
         # Child nodes
         self.__children = []
 
@@ -52,6 +53,9 @@ class SyntaxTree:
         self.aux_stack = deque()
         self.__create_tree(self.completed_regex, self.root)
 
+        self.__id_counter: int = 1
+        self.__numbered_nodes = {}
+        self.__process_in_post_order(self.root)
     
     def __define_alphabet(self, regex: str, operators: dict[str | str]) -> None:
         """
@@ -176,11 +180,99 @@ class SyntaxTree:
         is_empty = not bool(stack)
 
         return not is_empty, '(' if not is_empty else None
+    
+
+    def __process_in_post_order(self, node: SyntaxTreeNode) -> None:
+        """
+        Recursive method to set firstpos and lastpos;
+        Goes through the tree in post-order
+        """
+        if node.first_child is not None:
+            self.__process_in_post_order(node.first_child)
+
+        if node.last_child is not None:
+            self.__process_in_post_order(node.last_child)
+
+        self.__set_firstpos_and_lastpos(node)
+
+
+    def __set_firstpos_and_lastpos(self, node: SyntaxTreeNode) -> None:
+        """
+        Atribute the firstpos, lastpos and nullable attributes to TreeNodes
+        """
+        print(node.symbol)
+        if node.symbol == '&':
+            node.nullable = True
+
+        elif node.symbol == '|':
+            print(node.first_pos)
+            print(node.last_pos)
+            print(node.first_child)
+            print(node.last_child)
+            node.first_pos = [
+                pos
+                for child in [node.first_child, node.last_child]
+                for pos in (child.first_pos or [])
+                if pos != []
+            ]
+            node.last_pos = [
+                pos
+                for child in [node.first_child, node.last_child]
+                for pos in (child.last_pos or [])
+                if pos != []
+            ]
+
+            if node.first_child.nullable or node.last_child.nullable:
+                node.nullable = True
+
+        elif node.symbol == '*':
+            node.first_pos = [pos for pos in node.first_child.first_pos if pos != []]
+            node.last_pos = [pos for pos in node.first_child.last_pos if pos != []]
+            node.nullable = True
+
+        elif node.symbol == '.':
+            if node.first_child.nullable and node.last_child.nullable:
+                node.nullable = True
+
+            if node.first_child.nullable:
+                node.first_pos = [
+                    pos
+                    for child in [node.first_child, node.last_child]
+                    for pos in child.first_pos
+                ]
+            else:
+                node.first_pos = [pos for pos in node.first_child.first_pos]
+
+            if node.last_child.nullable:
+                node.last_pos = [
+                    pos
+                    for child in [node.first_child, node.last_child]
+                    for pos in child.last_pos
+                ]
+            else:
+                node.last_pos = [pos for pos in node.last_child.last_pos]
+        else:
+            node.id = self.__id_counter
+            self.__numbered_nodes[self.__id_counter] = node
+
+            self.__id_counter += 1
+
+            node.first_pos = [node.id]
+            node.last_pos = [node.id]
+
 
 
     def pretty_print(self):
         """
         Using PrettyPrintTree lib to print our Syntax Tree
         """
-        pt = PrettyPrintTree(lambda x: x.children, lambda x: x.symbol)
+
+        pt = PrettyPrintTree(
+            lambda x: x.children,
+            lambda x: f'{x.first_pos if x.first_pos else x.id} {x.symbol} {x.last_pos if x.last_pos else x.id}' 
+        )
         pt(self.root)
+
+        print('Numbered nodes: ')
+        for k, v in self.__numbered_nodes.items():
+            print(f'{k} - {v.symbol}')
