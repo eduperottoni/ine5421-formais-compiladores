@@ -2,12 +2,12 @@ from dataclasses import dataclass
 
 @dataclass
 class State:
-    source: set[str]
+    source: list[int]
 
     def __eq__(self, other):
         if isinstance(other, State):
             return (
-                self.source == other.source
+                set(self.source) == set(other.source)
             )
         return False
     

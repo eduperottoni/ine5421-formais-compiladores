@@ -303,16 +303,18 @@ class SyntaxTree:
         visited_states = []
         final_states = []
         transitions = []
+        initial_state = self.root.first_pos
         
         final_id = list(self.__leaf_nodes.keys())[-1]
-        print(f'ID FINAL = {final_id}')
+
+        # print(f'ID FINAL = {final_id}')
         while states:
             state = states.pop(0)
             visited_states.append(state)
 
-            print(f'CURRENT STATE: {state}')
+            # print(f'CURRENT STATE: {state}')
             # Checking if it's a final state
-            if final_id in state:
+            if final_id in state.source:
                 final_states.append(state)
             
             new_transitions = self.__create_transitions(state)
@@ -321,27 +323,32 @@ class SyntaxTree:
             for transition in new_transitions:
                 if transition.target != []:
                     new_state = transition.target
-                    if not self.__check_state_already_created(new_state, visited_states):
-                        states.append(new_state)
-            
-        print(visited_states)
-        print(final_states)
-        print(transitions)
+                    state = State(new_state)
+                    # print(f'STATE: {state}')
+                    # print(f'VISITED: {visited_states}')
+                    if not state in visited_states and not state in states:
+                        states.append(state)
+
+        print(f'INITIAL = {initial_state}') 
+        print(f'VISITED = {visited_states}')
+        print(f'ALPHABET = {self.alphabet}')
+        print(f'FINALS = {final_states}')
+        print(f'TRANSITIONS = {transitions}')
 
 
-    def __check_state_already_created(self, state: list[int], states_list:list[list[int]]) -> bool:
-        print(f'{state} já existe?')
-        print(states_list)
-        exist = False
-        for s in states_list:
-            if len(s) == len(state):
-                for index, item in enumerate(s):
-                    exist = True if state[index] == item else False
-                if exist == True:
-                    print('Sim')
-                    return True
-        print('não')
-        return False
+    # def __check_state_already_created(self, state: list[int], states_list:list[list[int]]) -> bool:
+    #     print(f'{state} já existe?')
+    #     print(states_list)
+    #     exist = False
+    #     for s in states_list:
+    #         if len(s) == len(state):
+    #             for index, item in enumerate(s):
+    #                 exist = True if state[index] == item else False
+    #             if exist == True:
+    #                 print('Sim')
+    #                 return True
+    #     print('não')
+    #     return False
 
 
     def __create_transitions(self, state: list[int]):
@@ -349,8 +356,8 @@ class SyntaxTree:
         Creating transitions
         """
         transitions = {}
-        print(f'STATE: {state}')
-        for id in state:
+        # print(f'STATE: {state}')
+        for id in state.source:
             # Create transition by symbol
             symbol = self.__leaf_nodes[id].symbol
             followpos = self.__followpos[id]
@@ -362,17 +369,18 @@ class SyntaxTree:
         
         transitions_list = []
         for symbol, target in transitions.items():
-            print(f'SYMBOL: {symbol}')
-            print(f'TARGET: {target}')
+            # print(f'SYMBOL: {symbol}')
+            # print(f'TARGET: {target}')
             t = Transition(state, symbol, sorted(list(target)))
             transitions_list.append(t)
+
+        ordered_transitions = sorted(transitions_list, key=lambda x: (x.symbol))
         
-        return transitions_list
+        return ordered_transitions
 
 
-
-    def __get_initial_state(self) -> list[int]:
-        return self.root.first_pos
+    def __get_initial_state(self) -> State:
+        return State(self.root.first_pos)
 
 
     def pretty_print(self):
