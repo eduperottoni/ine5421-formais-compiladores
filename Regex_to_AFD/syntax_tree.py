@@ -1,8 +1,26 @@
 from collections import deque
 # from typing import Self
 from PrettyPrint import PrettyPrintTree
-from transition import Transition
+from dataclasses import dataclass
 from state import State
+from transition import Transition
+
+class SyntaxTreeBuilder():
+    """
+    Syntax Tree builder
+    """
+
+    operators = {
+        'concat': '.',
+        'or': '|',
+        'star': '*',
+        'open_par': '(',
+        'close_par': ')'
+    }
+
+    @classmethod
+    def build_tree(cls, regex: str) -> 'SyntaxTree':
+        return SyntaxTree(regex, cls.operators)
 
 class SyntaxTreeNode:
     """
@@ -68,7 +86,7 @@ class SyntaxTree:
         """
         alphabet = {i for i in f'({regex})#' if i not in operators.values()}
         self.alphabet = alphabet
-        print(f'Alphabet defined: {self.alphabet}')
+        # print(f'Alphabet defined: {self.alphabet}')
 
     
     def __complete_regex(self, regex: str) -> None:
@@ -90,7 +108,7 @@ class SyntaxTree:
                 new_regex += item
 
         self.completed_regex = f'{new_regex}#'
-        print(f"Regex's completeness result: {self.completed_regex}")
+        # print(f"Regex's completeness result: {self.completed_regex}")
 
 
     def __create_tree(self, regex: str, root: SyntaxTreeNode) -> None:
@@ -108,8 +126,8 @@ class SyntaxTree:
             root.symbol = operator
             # 3 - We get the splitted parts 
             left, right = self.__divide_regex(regex, position)
-            print(f'Calling recursively: {left}')
-            print(f'Calling recursively: {right}')
+            # print(f'Calling recursively: {left}')
+            # print(f'Calling recursively: {right}')
             # 4 - We create new nodes and call recursively to each one
             root.append_child(SyntaxTreeNode(None))
             self.__create_tree(left, root.first_child)
@@ -123,7 +141,7 @@ class SyntaxTree:
         Considering the regex, we found out the position of the last
         occurrence of one of the operators, in inverse order of precedence
         """
-        print(f'Searching operator {regex}')
+        # print(f'Searching operator {regex}')
         # We search in the inverse order of natural precedence
         for oper in ['|', '.', '*']:
             self.aux_stack.clear()
@@ -282,23 +300,22 @@ class SyntaxTree:
         """
         Set followpos to concat or star node
         """
-        match node.symbol:
-            case '*':
-                for n in node.last_pos:
-                    for id in node.first_pos:
-                        self.__followpos[n].add(id)
-            case '.':
-                for n in node.first_child.last_pos:
-                    for id in node.last_child.first_pos:
-                        self.__followpos[n].add(id)
+        if node.symbol == '*':
+            for n in node.last_pos:
+                for id in node.first_pos:
+                    self.__followpos[n].add(id)
+        if node.symbol == '.':
+            for n in node.first_child.last_pos:
+                for id in node.last_child.first_pos:
+                    self.__followpos[n].add(id)
 
 
     def to_afd(self):
-        print('-'*30)
-        print(f'LEAF NODES: {self.__leaf_nodes}')
-        print('-'*30)
-        print(f'FOLLOWPOS: {self.__followpos}')
-        print('-'*30)
+        # print('-'*30)
+        # print(f'LEAF NODES: {self.__leaf_nodes}')
+        # print('-'*30)
+        # print(f'FOLLOWPOS: {self.__followpos}')
+        # print('-'*30)
         states = [self.__get_initial_state()]
         visited_states = []
         final_states = []
@@ -329,26 +346,50 @@ class SyntaxTree:
                     if not state in visited_states and not state in states:
                         states.append(state)
 
-        print(f'INITIAL = {initial_state}') 
-        print(f'VISITED = {visited_states}')
-        print(f'ALPHABET = {self.alphabet}')
-        print(f'FINALS = {final_states}')
-        print(f'TRANSITIONS = {transitions}')
+        # print(f'INITIAL = {initial_state}') 
+        # print(f'VISITED = {visited_states}')
+        # print(f'ALPHABET = {self.alphabet}')
+        # print(f'FINALS = {final_states}')
+        # print(f'TRANSITIONS = {transitions}')
+        return self.__format_str(initial_state, visited_states, final_states, transitions)
+    
 
+    def __format_str(self,
+                     intitial: list[int],
+                     all: list[State],
+                     finals: list[State],
+                     transitions: list[Transition]) -> str:
+        af_str = ''
 
-    # def __check_state_already_created(self, state: list[int], states_list:list[list[int]]) -> bool:
-    #     print(f'{state} já existe?')
-    #     print(states_list)
-    #     exist = False
-    #     for s in states_list:
-    #         if len(s) == len(state):
-    #             for index, item in enumerate(s):
-    #                 exist = True if state[index] == item else False
-    #             if exist == True:
-    #                 print('Sim')
-    #                 return True
-    #     print('não')
-    #     return False
+        # Quantity of states
+        af_str += f'{len(all)};'
+        # Initial state
+        initial_str = ",".join([str(i) for i in intitial])
+        af_str += f'{{{initial_str}}};'
+        # Final states
+        
+        curr_str = []
+        for final in finals:
+            curr_str.append(f'{{{",".join([str(i) for i in final.source])}}}')
+        af_str += f'{{{",".join(curr_str)}}};'
+        # Alphabet
+        self.alphabet.remove('#')
+        if '&' in self.alphabet:
+            self.alphabet.remove('&')
+        af_str += f'{{{",".join(sorted([letter for letter in self.alphabet]))}}};'
+        #Transitions
+        for transition in transitions:
+            if transition.symbol != '#':
+                source = f'{{{",".join([str(i) for i in transition.source.source])}}}'
+                symbol = f'{transition.symbol}'
+                target = f'{{{",".join([str(i) for i in transition.target])}}}'
+                af_str += f'{source},{symbol},{target};'
+
+            # if transition.symbol != '#':
+            #     source = f'{{{",".join([i for i in transition.source.source])}}}'
+            #     af_str += f'{{{transition.source}}}'
+        print(af_str[:-1])
+
 
 
     def __create_transitions(self, state: list[int]):
@@ -393,7 +434,3 @@ class SyntaxTree:
             lambda x: f'{x.first_pos if x.first_pos else x.id} {x.symbol} {x.last_pos if x.last_pos else x.id}' 
         )
         pt(self.root)
-
-        print('Numbered nodes: ')
-        for k, v in self.__leaf_nodes.items():
-            print(f'{k} - {v.symbol}')
