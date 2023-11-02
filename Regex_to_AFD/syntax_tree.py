@@ -1,6 +1,8 @@
 from collections import deque
 # from typing import Self
 from PrettyPrint import PrettyPrintTree
+from transition import Transition
+from state import State
 
 class SyntaxTreeNode:
     """
@@ -54,8 +56,11 @@ class SyntaxTree:
         self.__create_tree(self.completed_regex, self.root)
 
         self.__id_counter: int = 1
-        self.__numbered_nodes = {}
+        self.__leaf_nodes = {}
+        self.__followpos = {}
+
         self.__process_in_post_order(self.root)
+        self.__create_followpos(self.root)
     
     def __define_alphabet(self, regex: str, operators: dict[str | str]) -> None:
         """
@@ -198,17 +203,13 @@ class SyntaxTree:
 
     def __set_firstpos_and_lastpos(self, node: SyntaxTreeNode) -> None:
         """
-        Atribute the firstpos, lastpos and nullable attributes to TreeNodes
+        Atribute values to firstpos, lastpos and nullable attributes of nodes
         """
-        print(node.symbol)
         if node.symbol == '&':
             node.nullable = True
 
         elif node.symbol == '|':
-            print(node.first_pos)
-            print(node.last_pos)
-            print(node.first_child)
-            print(node.last_child)
+
             node.first_pos = [
                 pos
                 for child in [node.first_child, node.last_child]
@@ -251,15 +252,127 @@ class SyntaxTree:
                 ]
             else:
                 node.last_pos = [pos for pos in node.last_child.last_pos]
+        
         else:
             node.id = self.__id_counter
-            self.__numbered_nodes[self.__id_counter] = node
+            self.__leaf_nodes[self.__id_counter] = node
+            self.__followpos[self.__id_counter] = set()
 
             self.__id_counter += 1
 
             node.first_pos = [node.id]
             node.last_pos = [node.id]
 
+
+    def __create_followpos(self, node: SyntaxTreeNode) -> None:
+        """
+        Create the followpos for each node with a symbol from expression alphabet in the tree
+        """
+        # traverse in post-order
+        if node.first_child is not None:
+            self.__create_followpos(node.first_child)
+
+        if node.last_child is not None:
+            self.__create_followpos(node.last_child)
+
+        if node.symbol in ['.', '*']: self.__set_followpos(node)
+
+    
+    def __set_followpos(self, node: SyntaxTreeNode) -> None:
+        """
+        Set followpos to concat or star node
+        """
+        match node.symbol:
+            case '*':
+                for n in node.last_pos:
+                    for id in node.first_pos:
+                        self.__followpos[n].add(id)
+            case '.':
+                for n in node.first_child.last_pos:
+                    for id in node.last_child.first_pos:
+                        self.__followpos[n].add(id)
+
+
+    def to_afd(self):
+        print('-'*30)
+        print(f'LEAF NODES: {self.__leaf_nodes}')
+        print('-'*30)
+        print(f'FOLLOWPOS: {self.__followpos}')
+        print('-'*30)
+        states = [self.__get_initial_state()]
+        visited_states = []
+        final_states = []
+        transitions = []
+        
+        final_id = list(self.__leaf_nodes.keys())[-1]
+        print(f'ID FINAL = {final_id}')
+        while states:
+            state = states.pop(0)
+            visited_states.append(state)
+
+            print(f'CURRENT STATE: {state}')
+            # Checking if it's a final state
+            if final_id in state:
+                final_states.append(state)
+            
+            new_transitions = self.__create_transitions(state)
+            transitions.extend(new_transitions)
+
+            for transition in new_transitions:
+                if transition.target != []:
+                    new_state = transition.target
+                    if not self.__check_state_already_created(new_state, visited_states):
+                        states.append(new_state)
+            
+        print(visited_states)
+        print(final_states)
+        print(transitions)
+
+
+    def __check_state_already_created(self, state: list[int], states_list:list[list[int]]) -> bool:
+        print(f'{state} já existe?')
+        print(states_list)
+        exist = False
+        for s in states_list:
+            if len(s) == len(state):
+                for index, item in enumerate(s):
+                    exist = True if state[index] == item else False
+                if exist == True:
+                    print('Sim')
+                    return True
+        print('não')
+        return False
+
+
+    def __create_transitions(self, state: list[int]):
+        """
+        Creating transitions
+        """
+        transitions = {}
+        print(f'STATE: {state}')
+        for id in state:
+            # Create transition by symbol
+            symbol = self.__leaf_nodes[id].symbol
+            followpos = self.__followpos[id]
+            if symbol in transitions:
+                for i in followpos:
+                    transitions[symbol].add(i)
+            else:
+                transitions[symbol] = set(followpos)
+        
+        transitions_list = []
+        for symbol, target in transitions.items():
+            print(f'SYMBOL: {symbol}')
+            print(f'TARGET: {target}')
+            t = Transition(state, symbol, sorted(list(target)))
+            transitions_list.append(t)
+        
+        return transitions_list
+
+
+
+    def __get_initial_state(self) -> list[int]:
+        return self.root.first_pos
 
 
     def pretty_print(self):
@@ -274,5 +387,5 @@ class SyntaxTree:
         pt(self.root)
 
         print('Numbered nodes: ')
-        for k, v in self.__numbered_nodes.items():
+        for k, v in self.__leaf_nodes.items():
             print(f'{k} - {v.symbol}')
